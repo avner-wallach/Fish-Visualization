@@ -1,0 +1,17 @@
+function make_video_from_imgs(filename)
+    presentpath='Z:\AW\presentations\';    
+
+    load(filename);
+    F=figure;
+    for i=1:size(selected_imgs,1)
+        vidout=VideoWriter([present'vidout',num2str(i)]);
+        vidout.FrameRate=25;
+        open(vidout);
+        for j=1:size(selected_imgs,2)            
+            writeVideo(vidout,selected_imgs(i,j));
+        end
+        close(vidout);
+    end
+
+end
+   

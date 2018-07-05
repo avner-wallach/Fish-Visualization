@@ -1,0 +1,43 @@
+function plot_pcaspace(frame,eod,file)
+% get neutral fish image
+    presentpath='Z:\AW\presentations\';    
+    selected_imgs=[];   
+    F=figure;   
+%     set(F,'Position',[0 0 1000 1000]);
+    int=0.05;
+    M=  [0 int;
+        0.25-int/2 0.25+int/2;
+        0.5-int/2 0.5+int/2;
+        0.75-int/2 0.75+int/2;
+        1-int 1]
+    pcvec=[14:20];
+    for p=1:numel(pcvec)
+        zcol=pcvec(p);
+        ctlcol=setdiff(pcvec,zcol);  
+        imgs=get_posture_images(frame,file,14,[15:20],M,'imgnum',5,'track','features',...
+            'selfile',1);
+        plot_imgs_dlg;
+    end
+        
+    save([presentpath,'presentation_imgs'],'selected_imgs');
+    
+    function plot_imgs_dlg
+        F=figure;
+        k=1;
+        for i=1:size(imgs,1)
+            for j=1:size(imgs,2)
+                subplot(size(imgs,1),size(imgs,2),k);
+                imshow(imgs(i,j).cdata);
+                k=k+1;
+            end
+            prompt{i} = ['Line ',num2str(i),':'];
+        end
+        
+        dlg_title = 'Choose images';
+        num_lines = size(imgs,1);        
+        answer = inputdlg(prompt,dlg_title,num_lines,[],'WindowStyle','normal');
+        for i=1:size(imgs,1)
+            selected_imgs=[selected_imgs imgs(i,str2num(answer{i}))];
+        end
+    end
+end

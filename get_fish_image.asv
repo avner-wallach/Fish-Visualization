@@ -1,0 +1,148 @@
+function [ frames] = get_fish_image(varargin)
+%GET_FISH_IMAGE extract image from video file 
+%   Detailed explanation goes here
+%%env params
+datapath=getenv('DATAPATH');
+sdate=getenv('SESSDATE');
+framescale=str2num(getenv('FRAMESCALE')); %scaling of video file for feature tracking
+sesspath=[datapath,'\',sdate,'\'];
+%% params
+params.coormode='allo';
+params.trackmode='off';
+params.bgmode='regular';
+params.cropW=200;
+params.cropH=800;
+params.vecL=50;
+params.bgthreshold=50;
+params.bglevel=150;
+params.kopen=5;
+params.kclose=9;
+params.cthreshold=0.8;
+%% vars
+x0=0;
+y0=0;
+a0=0;
+F=figure;
+COL=colormap('lines');
+close(F);
+%% get varins
+n=length(varargin);
+switch n
+    case 1
+        error('too few input arguments!');
+    case 2 %get_fish_image(filenum,idx)
+        filenums=num2str(varargin{1});
+        idx=varargin{2};
+    otherwise %get_fish_image(filenum,idx,{fname,fvalue})
+        filenum=num2str(varargin{1});
+        idx=varargin{2};
+        if(mod(n,2)) %odd number of args
+            error('wrong number of input arguments!');
+        else
+            i=3;
+            while(i<n)
+                params.(varargin{i})=varargin{i+1};
+                i=i+2;
+            end
+        end
+end
+for v=1:numel(filenum)
+    % get frame from video
+    vid = VideoReader([sesspath,'video_',filenum(v),'.avi']);
+    % get data file
+    if(strcmp(params.coormode,'ego') | ~strcmp(params.trackmode,'off')...
+            | strcmp(params.bgmode,'remove'))
+        datafile=[sesspath,'data_',filenum];
+        s=load(datafile);        
+        data=s.data;        
+    end
+    %get tracking file
+    if(strcmp(params.trackmode,'features'))
+        trackfile=[sesspath,'trackedFeaturesRaw_',filenum];
+        [num,txt,raw] = xlsread([trackfile,'.csv']);    
+        fnames=unique(txt);
+    end        
+    if(numel(filenum)==1 & ~iscell(idx))
+        ids=idx;
+    else
+        ids=idx{v};
+    end
+    
+    for j=1:numel(ids)
+        frame = rgb2gray(read(vid, ids(j)));
+        process_frame;
+        frames(k)=frame;
+    end
+end
+
+    function process_frame       
+    %% remove bg if selected
+    if(strcmp(params.bgmode,'remove'))
+        mask1=imfuse(data.FILE.BG,frame,'diff');
+        mask2=uint8(mask1>params.bgthreshold);
+        mask4=(imclose(imopen(mask2,ones(params.kopen)),ones(params.kclose)));
+        frame=frame.*mask4+params.bglevel*uint8(~mask4);
+    end
+    %% if in ego mode or vector tracking mode- get location and heading azimut
+    if(strcmp(params.coormode,'ego') | ~strcmp(params.trackmode,'off'))
+        xind=cellfun(@(x) strcmp(x,'X'),data.FILE.model);
+        yind=cellfun(@(x) strcmp(x,'Y'),data.FILE.model);
+        aind=cellfun(@(x) strcmp(x,'azim'),data.FILE.model);    
+        X=data.FRAME.posture(idx+1,xind);
+        Y=data.FRAME.posture(idx+1,yind);
+        a=data.FRAME.posture(idx+1,aind);
+    end
+    %% tracking mode= 'features'
+    if(strcmp(params.trackmode,'features'))
+        for i=1:numel(fnames)
+            ind=find(strcmp(txt,fnames{i}))+1;    
+            x(i)=num(idx+1,ind(1))*framescale;
+            y(i)=num(idx+1,ind(2))*framescale;
+            c(i)=num(idx+1,ind(3));        
+        end
+        x(c<params.cthreshold)=NaN;
+        y(c<params.cthreshold)=NaN;
+    end
+    %% ego mode- 'headfix' fish
+    if(strcmp(params.coormode,'ego'))
+        x0=size(frame,2)/2;
+        y0=size(frame,1)/2;
+        frame=imtranslate(frame,[x0-X,y0-Y]); %center image around fish
+        frame=imrotate(frame,rad2deg(a)+90,'bilinear','crop');
+        frame=imcrop(frame,[x0-params.cropW/2,y0-params.cropH/4,params.cropW,params.cropH*0.75]);        
+    %     y0=params.cropH/4;
+    %     x0=params.cropW/2;
+    %     a0=a+pi/2;
+        if(strcmp(params.trackmode,'features'))
+            [x,y]=allo2ego(x,y,a,X,Y);
+            x=x+params.cropW/2;
+            y=-y+params.cropH/4;
+        end
+        a=-pi/2;
+        X=params.cropW/2;
+        Y=params.cropH/4;
+    end 
+    %% display image ?
+    im = imshow(frame);
+    hold on;
+
+    if(strcmp(params.trackmode,'vector'))
+        U=params.vecL*cos(a);
+        V=params.vecL*sin(a);
+        H=quiver(X,Y,U,V,'LineWidth',3,'MaxHeadSize',10);    
+    elseif(strcmp(params.trackmode,'features'))
+        pecind=find(cellfun(@(x) numel(strfind(x,'Pec')),fnames));
+        chinind=find(cellfun(@(x) numel(strfind(x,'chin')),fnames));
+        for(i=1:numel(x))
+            H=plot(x(i),y(i),'.');
+            set(H,'Color',COL(1,:),'MarkerSize',10);
+            if(ismember(i,pecind))
+                set(H,'Color',COL(2,:));
+            elseif(ismember(i,chinind))
+                set(H,'Color',COL(3,:));
+            end
+        end
+    end
+    end
+end
+
