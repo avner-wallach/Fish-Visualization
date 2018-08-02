@@ -1,11 +1,12 @@
-function make_video_from_imgs(imgs)
+function make_video_from_imgs(imgs,vidname)
     presentpath='Z:\AW\presentations\';    
-    rep=10;
+    rep=1;
 %     load([presentpath,filename]);
     
     for i=1:size(imgs,1)
-        vidout=VideoWriter([presentpath,'vidout',num2str(i)]);
-        vidout.FrameRate=1;
+        i
+        vidout=VideoWriter([presentpath,vidname,num2str(i)]);
+        vidout.FrameRate=2.5;
         open(vidout);
         for k=1:rep
             for j=1:size(imgs,2)            

@@ -11,6 +11,8 @@ params.headfix='off';
 params.track='off';
 params.bg='off';
 params.objects='off';
+params.plotter=[];
+params.plotint=100; %in frames
 params.cropW=200;
 params.cropH=600;
 params.vecL=50;
@@ -61,13 +63,13 @@ for v=1:numel(filenums)
         if(strcmp(params.track,'features'))
             trackfile=[sesspath,'trackedFeaturesRaw_',filenum];
             [num,txt,raw] = xlsread([trackfile,'.csv']);    
-            fnames=unique(txt);
+            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
         end        
     else
         vid=params.vid;
         data=params.data;
         txt=params.txt;
-        fnames=unique(txt);        
+        fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
         num=params.num;
     end
     if(numel(filenums)==1 & ~iscell(ids))
@@ -105,10 +107,15 @@ end
     %% tracking mode= 'features'
     if(strcmp(params.track,'features'))
         for i=1:numel(fnames)
-            ind=find(strcmp(txt,fnames{i}))+1;    
-            x(i)=num(idx+1,ind(1))*framescale;
-            y(i)=num(idx+1,ind(2))*framescale;
-            c(i)=num(idx+1,ind(3));        
+            ind=find(strcmp(txt(1,:),fnames{i}));    
+            if(~strcmp(txt(1,1),'bodyparts'))
+                ind=ind+1;
+            end
+            if(numel(ind))
+                x(i)=num(idx+1,ind(1))*framescale;
+                y(i)=num(idx+1,ind(2))*framescale;
+                c(i)=num(idx+1,ind(3));        
+            end
         end
         x(c<params.cthreshold)=NaN;
         y(c<params.cthreshold)=NaN;
@@ -145,6 +152,12 @@ end
         X=params.cropW/2;
         Y=params.cropH/4;
     end 
+    %% plotter
+    if(numel(plotter))
+        ind=[max(1,idx-params.plotint):idx];
+        t=data.FRAME.t(ind);
+        p=
+    end
     %% display image ?    
     im = imshow(frame);
     hold on;
