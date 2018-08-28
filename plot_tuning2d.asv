@@ -113,14 +113,13 @@ if(strcmp(params.headfix,'off') & (strcmp(params.bg,'on') | strcmp(params.bg,'im
         imagesc(ix,iy,file_struct(1).BG);
     else
         imagesc(ix,iy,params.image);
-    end
 end
 if(strcmp(params.headfix,'on') & isfield(params,'image'))
     sX=size(params.image,2);
     sY=size(params.image,1);
     ix=([1:sX]-sX/2)*pxl2mm;
     iy=(-[1:sY]+sY/3)*pxl2mm;
-    imagesc(ix,iy,params.image);
+    imagesc(ix,iy,fliplr(params.image));
 end
 
 hold on;
@@ -134,7 +133,7 @@ end
 set(A,'ALim',[0 max(quantile(N0(:),params.maxa),10)]);
 view(0,90);
 set(gca,'FontSize',params.fontsize)
-set(gca,'Xlim',params.x_bins([1 end])*pxl2mm,'Ylim',params.y_bins([1 end])*pxl2mm);
+set(gca,'Xlim',params.x_lim*pxl2mm,'Ylim',params.y_lim*pxl2mm);
 hold off;
 colorbar;
 

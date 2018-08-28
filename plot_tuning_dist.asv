@@ -1,21 +1,24 @@
-function [ F ] = plot_tuning2d( varargin )
+function [ F ] = plot_tuning_dist( varargin )
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 pxl2mm=str2num(getenv('PXLSIZE'));
 %% params
 params.headfix='on';
 params.bg='on';
-params.x_lim=[-150 150];   %default x bin limits for headfixed view
-params.y_lim=[-400 200];   %default x bin limits for headfixed view
-params.x_nbins=25;  %default x bin number
-params.y_nbins=25;  %default y bin number
+% params.x_lim=[-150 150];   %default x bin limits for headfixed view
+% params.y_lim=[-400 200];   %default x bin limits for headfixed view
+params.r_lim=[0 150];   %distance from RF center
+% params.x_nbins=25;  %default x bin number
+% params.y_nbins=25;  %default y bin number
+params.r_nbins=25;
+params.rf=[-12 0]; %RF center coordinates
 params.minsamp=1;
-params.maxa=0.4; %maximal alpha percentile
+% params.maxa=0.4; %maximal alpha percentile
 params.fontsize=16;
 params.objidx=1;    %object 
 params.freqmode='on';
 params.t_col=0;     %targe column
-params.t_val=0;  %target mean / boundaries
+params.t_edges=0;  %target mean / boundaries
 % params.clim='auto';
 %% get varins
 n=numel(varargin);
@@ -38,7 +41,7 @@ end
 params.K=numel(data_struct);
 
 %% get data vectors
-x=[]; y=[]; z=[]; t=[];
+x=[]; y=[]; z=[]; t=[]; r=[];
 for k=1:params.K
     x1=data_struct(k).data(:,params.xy_cols(1));
     y1=data_struct(k).data(:,params.xy_cols(2));
@@ -49,10 +52,12 @@ for k=1:params.K
         objx=file_struct(k).objects(params.objidx).x;
         objy=file_struct(k).objects(params.objidx).y;
         [x1,y1]=allo2ego(objx,objy,a,x1,y1); %obj coordinates rel. to LED
+        r1=((x1-params.rf(1)).^2 + (y1-params.rf(2)).^2).^(0.5);
     end    
     
     x=[x;x1];
     y=[y;y1];
+    r=[r;r1];
     z=[z;data_struct(k).data(:,z_col)];
     if(params.t_col~=0)
         t=[t;data_struct(k).data(:,params.t_col)];
@@ -75,53 +80,19 @@ end
 if(strcmp(data_struct(1).fnames{z_col},'iei') & strcmp(params.freqmode,'on'))
     z=1./z;
 end
-
     
 %% produce bins
-if(strcmp(params.headfix,'off'))
-    Ix=find(~isoutlier(x));
-    Iy=find(~isoutlier(y));
-    if(params.xy_cols==[find(cellfun(@(x) (strcmp(x,'X')),data_struct(1).fnames)) ...
-             find(cellfun(@(x) (strcmp(x,'Y')),data_struct(1).fnames))])
-         params.x_lim=[1 size(file_struct(1).BG,1)];
-         params.y_lim=[1 size(file_struct(1).BG,2)];
-    else
-        params.x_lim=[nanmin(x(Ix)) nanmax(x(Ix))];
-        params.y_lim=[nanmin(y(Iy)) nanmax(y(Iy))];
-    end
-end
-params.x_edges=linspace(params.x_lim(1),params.x_lim(2),params.x_nbins+1);
-params.y_edges=linspace(params.y_lim(1),params.y_lim(2),params.y_nbins+1);
-params.x_bins=edge2bin(params.x_edges);
-params.y_bins=edge2bin(params.y_edges);
+params.r_edges=linspace(params.r_lim(1),params.r_lim(2),params.r_nbins+1);
+params.r_bins=edge2bin(params.r_edges);
+params.t_nbins=numel(params.t_edges)-1;
+%% tuning
+    
 
-
-% x=data_struct.data(params.ind,params.xy_cols(1));
-% y=data_struct.data(params.ind,params.xy_cols(2));
-% z=data_struct.data(params.ind,z_col);
-%%
+    
 [N0,Mz,Sz]=tuning2d();
 AL=min(N0,quantile(N0(:),params.maxa));
 F=gcf;
 A=gca;
-if(strcmp(params.headfix,'off') & (strcmp(params.bg,'on') | strcmp(params.bg,'image')))
-    sX=size(file_struct(1).BG,2);
-    sY=size(file_struct(1).BG,1);
-    ix=([1:sX])*pxl2mm;
-    iy=([1:sY])*pxl2mm;    
-    if(strcmp(params.bg,'on'))
-        imagesc(ix,iy,file_struct(1).BG);
-    else
-        imagesc(ix,iy,params.image);
-    end
-end
-if(strcmp(params.headfix,'on') & isfield(params,'image'))
-    sX=size(params.image,2);
-    sY=size(params.image,1);
-    ix=([1:sX]-sX/2)*pxl2mm;
-    iy=(-[1:sY]+sY/3)*pxl2mm;
-    imagesc(ix,iy,params.image);
-end
 
 hold on;
 S=surf(params.x_bins*pxl2mm,params.y_bins*pxl2mm,ones(size(Mz')),...
@@ -134,16 +105,22 @@ end
 set(A,'ALim',[0 max(quantile(N0(:),params.maxa),10)]);
 view(0,90);
 set(gca,'FontSize',params.fontsize)
-set(gca,'Xlim',params.x_bins([1 end])*pxl2mm,'Ylim',params.y_bins([1 end])*pxl2mm);
+set(gca,'Xlim',params.x_lim*pxl2mm,'Ylim',params.y_lim*pxl2mm);
 hold off;
 colorbar;
 
 function [N0,Mz,Sz]=tuning2d()
-Mx=numel(params.x_edges)-1;
-My=numel(params.y_edges)-1;
-N0=zeros(params.x_nbins,params.y_nbins);
-Mz=nan(params.x_nbins,params.y_nbins);
-Sz=nan(params.x_nbins,params.y_nbins);
+N0=zeros(params.r_nbins,params.t_nbins);
+Mz=nan(params.r_nbins,params.t_nbins);
+Sz=nan(params.r_nbins,params.t_nbins);
+for i=1:params.r_nbins
+    for j=1:(numel(params.t_edges)-1)
+        idx=find(r>params.r_edges(i) & r<=params.r_edges(i+1) &...
+                 th>params.th_edges(j) & th<=params.th_edges(j+1));
+
+    inds=find(t>=params.t_edges(i) & t<params.t_edges(i+1) & ...
+        y>=0 & x<=0);   %only ipsi-front quadrant
+
 for i=1:params.x_nbins
     for j=1:params.y_nbins
         idx=find(x>params.x_edges(i) & x<=params.x_edges(i+1) &...

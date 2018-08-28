@@ -15,8 +15,8 @@ if(n<baseargs | n>baseargs&(xor(mod(n,2),mod(baseargs,2))))
 end
 data_struct=varargin{1};
 file_struct=varargin{2};
-z_col=varargin{3};
-ctl_col=varargin{4};
+z_col=varargin{3};  %target variable
+ctl_col=varargin{4};    %variables controlled (kept around median)
 pctl_ranges=varargin{5};
 if(n>baseargs)
     i=baseargs+1;

@@ -16,10 +16,10 @@ params.plotint=100; %in frames
 params.cropW=400;
 params.cropH=600;
 params.vecL=50;
-params.bgthreshold=35;
+params.bgthreshold=50;
 params.bglevel=256;
 params.kopen=5;
-params.kclose=5;
+params.kclose=9;
 params.cthreshold=0.8;
 %% vars
 x0=0;
