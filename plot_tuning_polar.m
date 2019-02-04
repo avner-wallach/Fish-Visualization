@@ -4,7 +4,7 @@ function [ F ] = plot_tuning_polar( varargin )
 pxl2mm=str2num(getenv('PXLSIZE'));
 %% params
 params.bg='on';
-params.r_lim=[0 150]; %radius limits
+params.r_lim=[0 180]; %radius limits
 params.th_lim=[-pi pi]; %azimouth limits
 params.r_nbins=20;  %default r bin number
 params.th_nbins=21;  %default th bin number
@@ -15,6 +15,7 @@ params.fontsize=16;
 params.freqmode='on';
 params.t_col=0;     %targe column
 params.t_val=0;  %target mean / boundaries
+params.tank='rect'; %rectangular or circular tank
 % params.clim='auto';
 %% get varins
 n=numel(varargin);
@@ -28,11 +29,6 @@ z_col=varargin{3};
 params.xy_cols=[find(cellfun(@(x) (strcmp(x,'X')),data_struct(1).fnames)) ...
     find(cellfun(@(x) (strcmp(x,'Y')),data_struct(1).fnames))];%default is spatial mapping
 params.a_col=find(cellfun(@(x) (strcmp(x,'azim')),data_struct(1).fnames));
-
-% corner locations
-corners=sort(file_struct(1).corners);
-x_cor=[mean(corners(1:2,1)) mean(corners(3:4,1))]*pxl2mm;
-y_cor=[mean(corners(1:2,2)) mean(corners(3:4,2))]*pxl2mm;
 
 if(n>3)
     i=4;
@@ -80,27 +76,44 @@ end
 
 %% convert to wall coordinates
 R=params.r_lim(2);
-ind1=find(x<(x_cor(1)+R) & y>(y_cor(1)+R) & y<(y_cor(2)-R)); %west
-ind2=find(x>(x_cor(2)-R) & y>(y_cor(1)+R) & y<(y_cor(2)-R)); %east
-ind3=find(y<(y_cor(1)+R) & x>(x_cor(1)+R) & x<(x_cor(2)-R)); %north
-ind4=find(y>(y_cor(2)-R) & x>(x_cor(1)+R) & x<(x_cor(2)-R)); %south
+if(strcmp(params.tank,'rect'))
+    % corner locations
+    corners=sort(file_struct(1).corners);
+    x_cor=[mean(corners(1:2,1)) mean(corners(3:4,1))]*pxl2mm;
+    y_cor=[mean(corners(1:2,2)) mean(corners(3:4,2))]*pxl2mm;
 
-r=[x(ind1)-x_cor(1);...
-    x_cor(2)-x(ind2);...
-    y(ind3)-y_cor(1);...
-    y_cor(2)-y(ind4)];
-th=[-pi-a(ind1);...
-    0-a(ind2);...
-    -pi/2-a(ind3);...
-    pi/2-a(ind4)];
-% r=[x_cor(2)-x(ind2)];
-% th=[0-a(ind2)];
-th(th>pi)=th(th>pi)-2*pi;
-th(th<-pi)=th(th<-pi)+2*pi;
-z=[z(ind1);z(ind2);z(ind3);z(ind4)];
-if(params.t_col~=0)
-    t=[t(ind1);t(ind2);t(ind3);t(ind4)];
+    ind1=find(x<(x_cor(1)+R) & y>(y_cor(1)+R) & y<(y_cor(2)-R)); %west
+    ind2=find(x>(x_cor(2)-R) & y>(y_cor(1)+R) & y<(y_cor(2)-R)); %east
+    ind3=find(y<(y_cor(1)+R) & x>(x_cor(1)+R) & x<(x_cor(2)-R)); %north
+    ind4=find(y>(y_cor(2)-R) & x>(x_cor(1)+R) & x<(x_cor(2)-R)); %south
+
+    r=[x(ind1)-x_cor(1);...
+        x_cor(2)-x(ind2);...
+        y(ind3)-y_cor(1);...
+        y_cor(2)-y(ind4)];
+    th=[-pi-a(ind1);...
+        0-a(ind2);...
+        -pi/2-a(ind3);...
+        pi/2-a(ind4)];
+    th(th>pi)=th(th>pi)-2*pi;
+    th(th<-pi)=th(th<-pi)+2*pi;
+    z=[z(ind1);z(ind2);z(ind3);z(ind4)];
+    if(params.t_col~=0)
+        t=[t(ind1);t(ind2);t(ind3);t(ind4)];
+    end
+else %circular tank
+    file_struct(1).circle = file_struct(1).circle*pxl2mm;
+    rx=file_struct(1).circle(3)/2; ry=file_struct(1).circle(4)/2;    %ellipse radii
+    x0=file_struct(1).circle(1) + rx; y0=file_struct(1).circle(2) + ry; %center point
+    phi=atan2((y-y0),(x-x0));    %azimuth in tank
+    R1=hypot((x-x0),(y-y0)); %distance of fish from center
+    R2=(rx*ry)./sqrt((ry*cos(phi)).^2 + (rx*sin(phi)).^2); %distance of nearest point from cetner
+    r=R2-R1;    %distance of fish to nearest wall
+    th=phi-a;   %egocentric angle of closest wall
+    th(th>pi)=th(th>pi)-2*pi;
+    th(th<-pi)=th(th<-pi)+2*pi;    
 end
+    
 
 %% produce bins
 params.r_edges=linspace(params.r_lim(1),params.r_lim(2),params.r_nbins+1);
@@ -132,6 +145,8 @@ set(A,'ALim',[quantile(N0(:),params.mina) quantile(N0(:),params.maxa)]);
 view(0,90);
 set(gca,'FontSize',params.fontsize)
 set(gca,'XLim',params.r_lim(2)*[-1 1],'YLim',params.r_lim(2)*[-1 1]);
+set(gca,'Ydir','normal');
+axis('image');
 hold off;
 colorbar;
 

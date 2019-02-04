@@ -13,7 +13,7 @@ params.r_lim=[1 150];   %distance from RF center
 params.r_nbins=5;
 params.rf=[-15 0]; %RF center coordinates
 params.minsamp=1;
-params.maxa=0.6; %maximal alpha percentile
+params.maxa=0.3; %maximal alpha percentile
 params.fontsize=16;
 params.objidx=1;    %object 
 params.freqmode='on';
@@ -43,14 +43,14 @@ params.K=numel(data_struct);
 %% get data vectors
 x=[]; y=[]; z=[]; t=[]; r=[];
 for k=1:params.K
-    x1=data_struct(k).data(:,params.xy_cols(1));
-    y1=data_struct(k).data(:,params.xy_cols(2));
+    x1=data_struct(k).data(:,params.xy_cols(1))*pxl2mm;
+    y1=data_struct(k).data(:,params.xy_cols(2))*pxl2mm;
     % headfix
     if(strcmp(params.headfix,'on'))
         a_col=find(cellfun(@(x) (strcmp(x,'azim')),data_struct(k).fnames));
         a=data_struct(k).data(:,a_col);
-        objx=file_struct(k).objects(params.objidx).x;
-        objy=file_struct(k).objects(params.objidx).y;
+        objx=file_struct(k).objects(params.objidx).x*pxl2mm;
+        objy=file_struct(k).objects(params.objidx).y*pxl2mm;
         [x1,y1]=allo2ego(objx,objy,a,x1,y1); %obj coordinates rel. to LED
         r1=((x1-params.rf(1)).^2 + (y1-params.rf(2)).^2).^(0.5);
     end    
@@ -115,7 +115,7 @@ for i=1:params.r_nbins
     for j=1:params.t_nbins
         idx=find(r>params.r_edges(i) & r<=params.r_edges(i+1) &...
                  t>=params.t_edges(j) & t<params.t_edges(j+1) & ...
-                    y>=0 & x<=0);   %only ipsi-front quadrant
+                    y>=0 );   %only ipsi-front quadrant
         N0(i,j)=numel(idx);
         if(numel(idx)>=params.minsamp)
             Mz(i,j)=nanmean(z(idx));

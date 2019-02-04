@@ -1,4 +1,4 @@
-function [ frames] = get_fish_image(varargin)
+function [ frames,ax_grid] = get_fish_image(varargin)
 %GET_FISH_IMAGE extract image from video file 
 %   Detailed explanation goes here
 %%env params
@@ -13,7 +13,7 @@ params.bg='off';
 params.objects='off';
 params.plotter=[];
 params.plotint=100; %in frames
-params.cropW=400;
+params.cropW=500;
 params.cropH=600;
 params.vecL=50;
 params.bgthreshold=35;
@@ -21,6 +21,9 @@ params.bglevel=256;
 params.kopen=5;
 params.kclose=5;
 params.cthreshold=0.8;
+params.txt=[];        
+params.num=[];
+
 %% vars
 x0=0;
 y0=0;
@@ -68,9 +71,11 @@ for v=1:numel(filenums)
     else
         vid=params.vid;
         data=params.data;
-        txt=params.txt;
-        fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
-        num=params.num;
+        if(strcmp(params.track,'features'))
+            txt=params.txt;
+            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
+            num=params.num;
+        end
     end
     if(numel(filenums)==1 & ~iscell(ids))
         id=ids;
@@ -147,21 +152,30 @@ end
         end
         if(strcmp(params.objects,'on'))
             [xobj,yobj]=allo2ego(xobj,yobj,a,X,Y);
-            xobj=xobj+params.cropW/2;
-            yobj=-yobj+params.cropH/4;
+%             xobj=xobj+params.cropW/2;
+%             yobj=-yobj+params.cropH/3;
         end
+        
+        ix=([1:params.cropW]-params.cropW/2);
+        iy=([1:params.cropH]-2*params.cropH/3);
             
         a=-pi/2;
         X=params.cropW/2;
-        Y=params.cropH/4;
-    end 
+        Y=params.cropH/3;
+    else
+            ix=[1:size(frame,2)];
+            iy=[1:size(frame,1)];
+    end
     %% plotter NOT DONE
     if(numel(params.plotter))
         ind=[max(1,idx-params.plotint):idx];
         t=data.FRAME.t(ind);        
     end
     %% display image ?    
-    im = imshow(frame);
+    imagesc(ix,iy,repmat(flipud(frame),[1 1 3]));
+
+    ax_grid={ix,iy};
+%     im = imshow(frame);
     hold on;
 
     if(strcmp(params.track,'vector'))
@@ -186,6 +200,12 @@ end
         set(H,'Color',COL(4,:),'MarkerSize',20);        
     end
     hold off;
+
+    set(gca,'YDir','normal');   
+    axis('image');
+    set(gca,'Xlim',[ix(1) ix(end)],'Ylim',[min(iy) max(iy)]);    
+    set(gca,'XTick',[],'YTick',[]);
+
     end
 end
 
