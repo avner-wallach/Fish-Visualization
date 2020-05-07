@@ -1,21 +1,24 @@
-function [ F ] = plot_tuning2d( varargin )
+function [ Mz,N0 ] = plot_tuning2d( varargin )
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 pxl2mm=str2num(getenv('PXLSIZE'));
 %% params
 params.headfix='on';
 params.bg='on';
-params.x_lim=[-250 250];   %default x bin limits for headfixed view
-params.y_lim=[-400 200];   %default x bin limits for headfixed view
-params.x_nbins=20;  %default x bin number
-params.y_nbins=20;  %default y bin number
-params.minsamp=1;
+params.bgcol='w';
+params.x_lim=[-450 450];   %default x bin limits for headfixed view
+params.y_lim=[-550 300];   %default x bin limits for headfixed view
+params.x_nbins=25;  %default x bin number
+params.y_nbins=25;  %default y bin number
+params.minsamp=5;
 params.maxa=0.4; %maximal alpha percentile
 params.fontsize=16;
 params.objidx=1;    %object 
 params.freqmode='on';
 params.t_col=0;     %targe column
 params.t_val=0;  %target mean / boundaries
+params.mfunc='mean'; %function to plot: mean-mean response in each bin; slope-sensitivity to t; offset- intersect at t=0
+params.maxz=inf;
 % params.clim='auto';
 %% get varins
 n=numel(varargin);
@@ -71,14 +74,19 @@ if(isfield(params,'func') & params.t_col~=0)
     end
 end
 
+if(isfield(params,'zfunc'))
+    z=params.zfunc(z,2);
+elseif(strcmp(data_struct(1).fnames{z_col},'iei') & strcmp(params.freqmode,'on'))
+    z=1./z;
+end
+
 if(params.t_col~=0 & numel(params.t_col)==1 & ...
     strcmp(data_struct(1).fnames{params.t_col},'iei') & strcmp(params.freqmode,'on'))
     dt=nanmean(diff(sort(t)));
     t=1./(t+dt*randn(size(t)));
 end
-if(strcmp(data_struct(1).fnames{z_col},'iei') & strcmp(params.freqmode,'on'))
-    z=1./z;
-end
+
+z(abs(z)>params.maxz)=nan;
 %% home analysis
 if(strcmp(params.headfix,'home'))
     [x0,y0,a0]=get_home_angle(file_struct.home);
@@ -118,8 +126,18 @@ params.y_bins=edge2bin(params.y_edges);
 % y=data_struct.data(params.ind,params.xy_cols(2));
 % z=data_struct.data(params.ind,z_col);
 %%
-[N0,Mz,Sz]=tuning2d();
-AL=min(N0,quantile(N0(:),params.maxa));
+if(strcmp(params.mfunc,'mean'))
+    [N0,Mz,Sz]=tuning2d();
+else
+    [N0,P1,P2]=fitting2d();
+    if(strcmp(params.mfunc,'slope'))
+        Mz=P1;
+    else
+        Mz=P2;
+    end
+end
+% AL=min(N0,quantile(N0(:),params.maxa));
+AL=N0;
 F=gcf;
 A=gca;
 if(strcmp(params.headfix,'off') & (strcmp(params.bg,'on') | strcmp(params.bg,'image')))
@@ -138,7 +156,11 @@ if(strcmp(params.headfix,'on') & isfield(params,'image'))
     sY=size(params.image,1);
     ix=([1:sX]-sX/2)*pxl2mm;
     iy=(-[1:sY]+sY/3)*pxl2mm;
-    imagesc(ix,iy,params.image);
+    if(params.bgcol=='w')
+        imagesc(ix,iy,params.image);
+    else
+        imagesc(ix,iy,255-params.image);
+    end
 end
 if(strcmp(params.headfix,'home') & strcmp(params.bg,'on') )
     frame=file_struct(1).BG;
@@ -165,11 +187,17 @@ a=max(quantile(N0(:),params.maxa),10);
 set(A,'ALim',[0 a]);
 view(0,90);
 set(gca,'FontSize',params.fontsize)
-set(gca,'Xlim',params.x_bins([1 end])*pxl2mm,'Ylim',params.y_bins([1 end])*pxl2mm);
 set(gca,'YDir','normal');
 axis('image');
+set(gca,'Xlim',params.x_bins([1 end])*pxl2mm,'Ylim',params.y_bins([1 end])*pxl2mm);
 hold off;
 colorbar;
+if(params.bgcol=='k')
+    set(gca,'Color',[0 0 0],'XColor',[1 1 1],'YColor',[1 1 1]);
+    set(gcf,'Color',[0 0 0]);
+    colorbar(gca,'Color',[1 1 1]);
+end
+
 
 function [N0,Mz,Sz]=tuning2d()
 Mx=numel(params.x_edges)-1;
@@ -200,6 +228,31 @@ for i=1:params.x_nbins
         end
     end
 end
+end
+
+function [N0,P1,P2]=fitting2d()
+N0=zeros(params.x_nbins,params.y_nbins);
+P1=nan(params.x_nbins,params.y_nbins);
+P2=nan(params.x_nbins,params.y_nbins);
+zz=(z-nanmean(z))/nanstd(z);
+tt=(t-nanmean(t))/nanstd(t);
+for i=1:params.x_nbins
+    for j=1:params.y_nbins
+        idx=find(x>params.x_edges(i) & x<=params.x_edges(i+1) &...
+                 y>params.y_edges(j) & y<=params.y_edges(j+1));
+        idx=idx(~isnan(tt(idx)+zz(idx)));             
+        N0(i,j)=numel(idx);
+        if(numel(idx)>=params.minsamp)
+            [f,g]=fit(tt(idx),zz(idx),'poly1');
+            P1(i,j)=f.p1;
+            P2(i,j)=f.p2;
+            [rp,pval]=corr(tt(idx),zz(idx));
+            t_slope=rp*sqrt((numel(idx)-2)/(1-rp^2));
+%             N0(i,j)=-log10(pval);
+        end
+    end
+end
+
 end
 
     function [x0,y0,a0]=get_home_angle(home)

@@ -1,4 +1,4 @@
-function [ F ] = plot_tuning_polar( varargin )
+function [ Mz,N0 ] = plot_tuning_polar( varargin )
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 pxl2mm=str2num(getenv('PXLSIZE'));
@@ -6,16 +6,19 @@ pxl2mm=str2num(getenv('PXLSIZE'));
 params.bg='on';
 params.r_lim=[0 180]; %radius limits
 params.th_lim=[-pi pi]; %azimouth limits
-params.r_nbins=20;  %default r bin number
-params.th_nbins=21;  %default th bin number
-params.minsamp=1;
-params.mina=0.25;%minimal alpha percentile
-params.maxa=0.5; %maximal alpha percentile
+params.r_nbins=15;  %default r bin number
+params.th_nbins=15;  %default th bin number
+params.minsamp=5;
+params.mina=0.15;%minimal alpha percentile
+params.maxa=0.3; %maximal alpha percentile
 params.fontsize=16;
 params.freqmode='on';
 params.t_col=0;     %targe column
 params.t_val=0;  %target mean / boundaries
-params.tank='rect'; %rectangular or circular tank
+params.tank='circ'; %rectangular or circular tank
+params.mfunc='mean'; %function to plot: mean-mean response in each bin; slope-sensitivity to t; offset- intersect at t=0
+params.bgcol='w'; %background color, w=white, b=black
+params.ind_lim=[];
 % params.clim='auto';
 %% get varins
 n=numel(varargin);
@@ -65,15 +68,28 @@ if(isfield(params,'func') & params.t_col~=0)
     end
 end
 
+if(isfield(params,'zfunc'))
+    z=params.zfunc(z,2);
+elseif(strcmp(data_struct(1).fnames{z_col},'iei') & strcmp(params.freqmode,'on'))
+    z=1./z;
+end
+
 if(params.t_col~=0 & numel(params.t_col)==1 & ...
     strcmp(data_struct(1).fnames{params.t_col},'iei') & strcmp(params.freqmode,'on'))
     dt=nanmean(diff(sort(t)));
     t=1./(t+dt*randn(size(t)));
 end
-if(strcmp(data_struct(1).fnames{z_col},'iei') & strcmp(params.freqmode,'on'))
-    z=1./z;
+%% reduce indices
+if(numel(params.ind_lim))
+    inds=inrange(1:numel(z),params.ind_lim);
+    z=z(inds);
+    if(numel(t))
+        t=t(inds,:);
+    end
+    x=x(inds);
+    y=y(inds);
+    a=a(inds);
 end
-
 %% convert to wall coordinates
 R=params.r_lim(2);
 if(strcmp(params.tank,'rect'))
@@ -122,9 +138,21 @@ params.r_bins=edge2bin(params.r_edges);
 params.th_bins=edge2bin(params.th_edges);
 
 %%
-[N0,Mz,Sz]=tuning2d();
-AL=min(N0,quantile(N0(:),params.maxa));
-Mz=[Mz Mz(:,1)];
+if(strcmp(params.mfunc,'mean'))
+    [N0,Mz,Sz]=tuning2d();
+    AL=N0;
+else
+    [N0,P1,P2,Pv]=fitting2d();
+    if(strcmp(params.mfunc,'slope'))
+        Mz=P1;
+        AL=Pv;
+    else
+        Mz=P2;
+        AL=N0;
+    end
+end
+
+Mzz=[Mz Mz(:,1)];
 AL=[AL AL(:,1)];
 F=gcf;
 A=gca;
@@ -133,15 +161,23 @@ if(isfield(params,'image'))
     sY=size(params.image,1);
     ix=([1:sX]-sX/2)*pxl2mm;
     iy=(-[1:sY]+sY/3)*pxl2mm;
-    imagesc(ix,iy,params.image);
+    if(params.bgcol=='w')
+        imagesc(ix,iy,params.image);
+    else
+        imagesc(ix,iy,255-params.image);
+    end
     hold on;
 end
 
-S=polarplot3d(Mz,AL,'AngularRange',[-pi pi],'plottype','surfa','RadialRange',[0 150]);
+S=polarplot3d(Mzz,AL,'AngularRange',[-pi pi],'plottype','surfa','RadialRange',[0 150]);
 if(isfield(params,'clim'))
     set(A,'CLim',params.clim);
 end
-set(A,'ALim',[quantile(N0(:),params.mina) quantile(N0(:),params.maxa)]);
+if(strcmp(params.mfunc,'slope'))
+    set(A,'ALim',[-log10(0.05) -log10(0.01)]);
+else
+    set(A,'ALim',[quantile(N0(:),params.mina) quantile(N0(:),params.maxa)]);
+end
 view(0,90);
 set(gca,'FontSize',params.fontsize)
 set(gca,'XLim',params.r_lim(2)*[-1 1],'YLim',params.r_lim(2)*[-1 1]);
@@ -149,6 +185,11 @@ set(gca,'Ydir','normal');
 axis('image');
 hold off;
 colorbar;
+if(params.bgcol=='k')
+    set(gca,'Color',[0 0 0],'XColor',[1 1 1],'YColor',[1 1 1]);
+    set(gcf,'Color',[0 0 0]);
+    colorbar(gca,'Color',[1 1 1]);
+end
 
 function [N0,Mz,Sz]=tuning2d()
 Mx=numel(params.r_edges)-1;
@@ -175,6 +216,46 @@ for i=1:params.r_nbins
         end
     end
 end
+end
+
+function [N0,P1,P2,Pv]=fitting2d()
+N0=zeros(params.r_nbins,params.th_nbins);
+P1=nan(params.r_nbins,params.th_nbins);
+P2=nan(params.r_nbins,params.th_nbins);
+zz=(z-nanmean(z))/nanstd(z);
+tt=(t-nanmean(t))/nanstd(t);
+ff=figure;
+for i=1:params.r_nbins
+    for j=1:params.th_nbins
+        idx=find(r>params.r_edges(i) & r<=params.r_edges(i+1) &...
+            th>params.th_edges(j) & th<=params.th_edges(j+1));
+        idx=idx(~isnan(tt(idx)+zz(idx)));             
+        N0(i,j)=numel(idx);
+        if(numel(idx)>=params.minsamp)
+            f=fit(tt(idx),zz(idx),'poly1');
+%             if(i==8 & j==2)
+%                 figure(ff);
+%                 H=plot(tt(idx),zz(idx),'.');
+%                 set(H,'MarkerSize',18);
+%                 hold on;
+%                 H=plot(f);
+%                 set(H,'Color',[0 0 0],'LineWidth',3);
+%                 legend('off');
+%                 hold off;
+%                 title(['i=',num2str(i),'; j=',num2str(j)]);
+%                 set(gcf,'Color',[1 1 1]);
+%                 drawnow;
+%             end
+            P1(i,j)=f.p1;
+            P2(i,j)=f.p2;
+            [rp,pval]=corr(tt(idx),zz(idx));
+%             t_slope=rp*sqrt((numel(idx)-2)/(1-rp^2));
+%              N0(i,j)=-log10(pval);            
+            Pv(i,j)=-log10(pval);
+        end
+    end
+end
+close(ff);
 end
 
 end
