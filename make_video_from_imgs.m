@@ -6,8 +6,8 @@ function make_video_from_imgs(imgs,vidname,mode,N)
     
     for i=1:size(imgs,1)
         i
-        vidout=VideoWriter([presentpath,vidname,num2str(N),'.avi']);
-        vidout.FrameRate=10;
+        vidout=VideoWriter([presentpath,vidname,num2str(N)],'mpeg-4');
+        vidout.FrameRate=15;
         open(vidout);
         for k=1:rep
             for j=1:size(imgs,2)            

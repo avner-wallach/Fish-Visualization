@@ -6,20 +6,20 @@ function [FF,ax_grid]=visualize_fish_tracking(vidname,trackfile,ss,framenum)
     [fish,seg,coornames,data]=get_posture(txt,num);
     fnames1={'chin','mouth','Trunk1','Trunk2','Tail1','Tail2','CaudalFork'};      
     fnames2={'LPecTip','midpoint','RPecTip'};
-%     fnames3={'SideView'};
+    for j=1:numel(fnames1)
+        data.(fnames1{j}).xy=medfilt1(data.(fnames1{j}).xy,5,[],1);
+    end
+    for j=1:numel(fnames2)
+        data.(fnames2{j}).xy=medfilt1(data.(fnames2{j}).xy,5,[],1);
+    end
+    
     vid = VideoReader([vidname,'.avi']);
-%     vidout=VideoWriter('vidout1');
-%     vidout.FrameRate=25;
-%     open(vidout);
     
     currentFrame=ss;
     F=figure;
     set(F,'Color',[0 0 0],'Position',[1 41 1920 964]);
     COL=colormap('lines');
     A1=axes;
-%     set(A1,'Position',[0.13 0.11 0.5 0.815]);
-%     A2=axes;
-%     set(A2,'Position',[0.73 0.11 0.2 0.815]);
     for i=1:framenum
         axes(A1);
         frame = rgb2gray(read(vid, currentFrame));
@@ -58,40 +58,19 @@ function [FF,ax_grid]=visualize_fish_tracking(vidname,trackfile,ss,framenum)
         end
 
         H=plot(X*sfactor,Y*sfactor);        
-        set(H,'Marker','.','Linewidth',2,'MarkerSize',12,'Color',COL(2,:));    
+        set(H,'Marker','.','Linewidth',2,'MarkerSize',12,'Color',COL(3,:));    
         axis('image');
         set(gca,'Xlim',[ix(1) ix(end)],'Ylim',[min(iy) max(iy)]);    
         set(gca,'XTick',[],'YTick',[]);        
-%         X=[]; Y=[];        
-%         for j=1:numel(fnames3)
-%             xy= data.(fnames3{j}).xy(currentFrame,:);
-%             c= data.(fnames3{j}).c(currentFrame);
-%             if(c>th)
-%               X=[X;xy(1)];
-%               Y=[Y;xy(2)];
-%             else
-%               X=[X;NaN];
-%               Y=[Y;NaN];
-%             end
-%         end
-%         
-%         H=plot(X,Y);        
-%         set(H,'Marker','.','Linewidth',2,'MarkerSize',20);    
-%         set(A1,'XTick',[],'YTick',[])
 
         hold off;
-%         axes(A2);
-%         draw_skeleton();
 
         drawnow;
         pause(0.01);
         FF(i)=getframe;
         
-%         writeVideo(vidout,FF(i));
         currentFrame=currentFrame+1;        
     end
-%     close(vidout);
-%     save('tracked_frames','FF');
     
     function draw_skeleton()
         x0=0;
@@ -133,7 +112,7 @@ function [FF,ax_grid]=visualize_fish_tracking(vidname,trackfile,ss,framenum)
             theta=pi+fish(currentFrame,j+1);
             x=x0+[0 seg(j)*cos(theta)];
             y=y0+[0 seg(j)*sin(theta)];        
-            H=plot(x,y); set(H,'Color',COL(2,:),'Marker','.','MarkerSize',14,'LineWidth',2);
+            H=plot(x,y); set(H,'Color',COL(3,:),'Marker','.','MarkerSize',14,'LineWidth',2);
 %             x0=x(2); y0=y(2);            
 %         end
         
@@ -145,7 +124,7 @@ function [FF,ax_grid]=visualize_fish_tracking(vidname,trackfile,ss,framenum)
             theta=-fish(currentFrame,j+1);
             x=x0+[0 seg(j)*cos(theta)];
             y=y0+[0 seg(j)*sin(theta)];        
-            H=plot(x,y); set(H,'Color',COL(2,:),'Marker','.','MarkerSize',14,'LineWidth',2);
+            H=plot(x,y); set(H,'Color',COL(3,:),'Marker','.','MarkerSize',14,'LineWidth',2);
 %             x0=x(2); y0=y(2);            
 %         end
         hold off;

@@ -1,0 +1,25 @@
+function [ database ] = plot_one_unit( database,ops,segnum,fileind,lfpnum,unitnums,eod,file,IMGS,wind)
+%UNTITLED3 Summary of this function goes here
+%   Detailed explanation goes here
+i0=numel(database.tail.ex.p1);
+I=i0+(1:numel(unitnums));
+database.lfp.ratio(I)=plot_lfp(eod,ops,segnum,lfpnum,fileind);
+[database.psth.median(I),database.psth.peak(I),database.psth.latency(I)]=...
+    plot_trace_spikes(ops,segnum,fileind,lfpnum,unitnums,wind);
+
+for i=1:numel(unitnums)
+    database.unitname{1}=[num2str(expnum),'_',num2str(segnum),'_',num2str(lfpnum),'_',num2str(unitnum)]
+    t_col=6;
+    [database.tail.ex.p1(i0+i),database.tail.ex.p2(i0+i),...
+        database.tail.re.p1(i0+i),database.tail.re.p2(i0+i)]=...
+        plot_ex_re(eod,file,ops,segnum,['sc',num2str(unitnums(i))]...
+        ,['lfp',num2str(lfpnum)],t_col,IMGS);
+    t_col=1;
+      [database.freq.ex.p1(i0+i),database.freq.ex.p2(i0+i),...
+        database.freq.re.p1(i0+i),database.freq.re.p2(i0+i)]=...
+            plot_ex_re(eod,file,ops,segnum,['sc',num2str(unitnums(i))]...
+            ,['lfp',num2str(lfpnum)],t_col,IMGS);
+end
+
+end
+

@@ -1,6 +1,8 @@
-% load('Z:\mormyrid_data\analyzed data\all_networks.mat');
-% load('Z:\mormyrid_data\fish_images\straight_image.mat');
-% str_imgs=IMGS;
+% pth='/Volumes/sawtell-locker/home/aw3057/'
+% pth='z:/';
+% load([pth,'mormyrid_data/analyzed data/all_networks.mat']);
+% load([pth,'mormyrid_data/fish_images/straight_image.mat']);
+str_imgs=IMGS;
 c='*+o^';
 c='....';
 bgcol=1*[1 1 1]; %0=black, 1=white
@@ -17,6 +19,8 @@ for i=1:numel(wall_nets)
         net=wall_nets(i).net_struct(j);
         clear R;
         R=[net.model_loc.rsq net.model_niloc.rsq net.model_lfbloc.rsq net.model_fbloc.rsq net.model_fbniloc.rsq];
+        R=[net.model_loc.rsq net.model_niloc.rsq net.model_fbniloc.rsq];
+        
 %         R=[R R(2)+R(5)-R(1)];
         R=R-(p*R(1));
         allR=[allR;R'];
@@ -37,6 +41,8 @@ for i=1:numel(wall_nets)
         net=wall_nets(i).net_struct(j);
         clear R;
         R=[net.model_loc.rsq net.model_niloc.rsq net.model_lfbloc.rsq net.model_fbloc.rsq net.model_fbniloc.rsq];
+        R=[net.model_loc.rsq net.model_niloc.rsq net.model_fbniloc.rsq];
+        
 %         R=[R R(2)+R(5)-R(1)];
         R=R-(p*R(1));
         H=plot(R,':');
@@ -86,7 +92,6 @@ for i=1:numel(brass_nets)
 end
 set(gca,'Color',bgcol,'XTick',[1:6],'FontSize',18,'XColor',1-bgcol,'YColor',1-bgcol);
 set(gca,'XTickLabel',{'no NI','M','local FB','global FB','MFB','M+FB'},'XTickLabelRotation',90);
-return;
 %% prsq
 k=1
 for i=1:numel(wall_nets)

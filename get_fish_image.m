@@ -1,4 +1,4 @@
-function [ frames,ax_grid] = get_fish_image(varargin)
+function [frames,ax_grid] = get_fish_image(varargin)
 %GET_FISH_IMAGE extract image from video file 
 %   Detailed explanation goes here
 %%env params
@@ -9,6 +9,7 @@ sesspath=[datapath,'\',sdate,'\'];
 %% params
 params.headfix='off';
 params.track='off';
+params.trackname='trackedFeaturesRaw_';
 params.bg='off';
 params.objects='off';
 params.plotter=[];
@@ -29,7 +30,7 @@ x0=0;
 y0=0;
 a0=0;
 F=figure;
-COL=colormap('lines');
+COL=colormap(F,'lines');
 close(F);
 k=1;
 %% get varins
@@ -64,16 +65,16 @@ for v=1:numel(filenums)
         data=s.data;        
         %get tracking file
         if(strcmp(params.track,'features'))
-            trackfile=[sesspath,'trackedFeaturesRaw_',filenum];
+            trackfile=[sesspath,'video_',filenum,params.trackname];
             [num,txt,raw] = xlsread([trackfile,'.csv']);    
-            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
+            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y',params.trackname});
         end        
     else
         vid=params.vid;
         data=params.data;
         if(strcmp(params.track,'features'))
             txt=params.txt;
-            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y'});
+            fnames=setdiff(unique(txt),{'coords','likelihood','scorer','bodyparts','x','y',params.trackname});
             num=params.num;
         end
     end
@@ -172,7 +173,7 @@ end
         t=data.FRAME.t(ind);        
     end
     %% display image ?    
-    imagesc(ix,iy,repmat(flipud(frame),[1 1 3]));
+    imagesc(ix,iy,repmat((frame),[1 1 3]));
 
     ax_grid={ix,iy};
 %     im = imshow(frame);
@@ -187,7 +188,7 @@ end
         chinind=find(cellfun(@(x) numel(strfind(x,'chin')),fnames));
         for(i=1:numel(x))
             H=plot(x(i),y(i),'.');
-            set(H,'Color',COL(1,:),'MarkerSize',20);
+            set(H,'Color',COL(1,:),'MarkerSize',8);
             if(ismember(i,pecind))
                 set(H,'Color',COL(2,:));
             elseif(ismember(i,chinind))
@@ -201,10 +202,11 @@ end
     end
     hold off;
 
-    set(gca,'YDir','normal');   
+    set(gca,'YDir','reverse');   
     axis('image');
     set(gca,'Xlim',[ix(1) ix(end)],'Ylim',[min(iy) max(iy)]);    
     set(gca,'XTick',[],'YTick',[]);
+    set(gcf,'Units','normalized','Position',[0 0 1 1]);
 
     end
 end

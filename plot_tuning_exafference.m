@@ -1,28 +1,27 @@
-function [ Mz,N0,out_arg ] = plot_tuning_polar( varargin )
+function [ rsq ] = plot_tuning_exafference( varargin )
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 %% params
 params.bg='on';
 params.r_lim=[0 180]; %radius limits
 params.th_lim=[-pi pi]; %azimouth limits
-params.r_nbins=15;  %default r bin number
-params.th_nbins=15;  %default th bin number
-params.minsamp=25;
+params.r_nbins=25;  %default r bin number
+params.th_nbins=25;  %default th bin number
+params.minsamp=5;
+params.mina=0.15;%minimal alpha percentile
+params.maxa=0.3; %maximal alpha percentile
 params.fontsize=16;
 params.freqmode='on';
-params.t_col=0;     %targe column
+params.t_col=[1 5:14];     %targe column
 % params.t_val=0;  %target mean / boundaries
 params.objidx=0;    %object: 0=no object, wall analysis; >0= object centered
 params.tank='circ'; %rectangular or circular tank
 params.mfunc='mean'; %function to plot: mean-mean response in each bin; std-std response; slope-sensitivity to t; offset- intersect at t=0
-params.bgcol=[1 1 1]; %background color
+params.bgcol=[1 1 1]; %background color,
 params.ind_lim=[];
-params.zscore=1;
-params.roinum=0;
-params.binsize=.5;
-params.upsamp=.25;
-r=[]; th=[];
-out_arg=[];
+params.nhidden=10;
+params.fb_cols=[];
+
 % params.clim='auto';
 %% get varins
 n=numel(varargin);
@@ -58,7 +57,7 @@ else
     pxl2mm=str2num(getenv('PXLSIZE'));
 end
 %% get data vectors
-x=[]; y=[]; a=[]; z=[]; t=[];
+x=[]; y=[]; a=[]; z=[]; t=[]; fb=[];
 for k=1:params.K
     x1=data_struct(k).data(:,params.xy_cols(1));
     y1=data_struct(k).data(:,params.xy_cols(2));
@@ -71,6 +70,9 @@ for k=1:params.K
     if(params.t_col~=0)
         t=[t;data_struct(k).data(:,params.t_col)];
     end    
+    if(numel(params.fb_cols) & params.fb_cols~=0)
+        fb=[fb;data_struct(k).data(:,params.fb_cols)];
+    end
 end
 x=x*pxl2mm;
 y=y*pxl2mm;
@@ -100,7 +102,11 @@ if(params.t_col~=0 & numel(params.t_col)==1 & ...
 end
 %% reduce indices
 if(numel(params.ind_lim))
-    inds=inrange(1:numel(z),params.ind_lim);
+    if(numel(params.ind_lim)==2)
+        inds=inrange(1:numel(z),params.ind_lim);
+    elseif(numel(params.ind_lim==1))
+        inds=randperm(numel(z),params.ind_lim);
+    end
     z=z(inds);
     if(numel(t))
         t=t(inds,:);
@@ -108,13 +114,15 @@ if(numel(params.ind_lim))
     x=x(inds);
     y=y(inds);
     a=a(inds);
-    if(params.roinum>0 & strfind(data_struct(1).fnames{z_col},'sc'))
-        raster=raster(inrange(raster(:,2),params.ind_lim),:);
-        raster(:,2)=raster(:,2)-params.ind_lim(1);
-    end
+%     if(params.roinum>0)
+%         raster=raster(inrange(raster(:,2),params.ind_lim),:);
+%         raster(:,2)=raster(:,2)-params.ind_lim(1);
+%     end
 end
 %% convert to wall coordinates
 R=params.r_lim(2);
+r=[];
+th=[];
 if(params.objidx==0)
     convert_to_wall;
 else
@@ -126,127 +134,87 @@ params.r_edges=linspace(params.r_lim(1),params.r_lim(2),params.r_nbins+1);
 params.th_edges=linspace(params.th_lim(1),params.th_lim(2),params.th_nbins+1);
 params.r_bins=edge2bin(params.r_edges);
 params.th_bins=edge2bin(params.th_edges);
-%% zscore/dezscore data 
-if(isfield(params,'zscale'))
-    z=z*params.zscale(2) + params.zscale(1);
-else
-    if(params.zscore)
-        z=(z-nanmean(z))/nanstd(z);
-        t=(t-nanmean(t))/nanstd(t);
-    end
-end
-%%
-if(strcmp(params.mfunc,'mean') | strcmp(params.mfunc,'std'))
-    [N0,Mz,Sz]=tuning2d();
-    if(strcmp(params.mfunc,'std'))
-        Mz=Sz;
-    end
-    AL=min(N0,15);
-else
-    [N0,P1,P2,Pv]=fitting2d();
-    if(strcmp(params.mfunc,'slope'))
-        Mz=P1;
-        AL=min(Pv,-log10(0.01));
-    else
-        Mz=P2;
-        AL=min(N0,15);
-    end
-end
+%% filter
+z=medfilt1(z,3);
+% fb=medfilt1(fb,3);
+% 
+loc=[r th];
+%% get regression models
+% [ net_ex,rsq_ex,sig_ex] = ni_network(loc',z');
+% [ net_re,rsq_re,sig_re] = ni_network(t',z');
+% % z_ex=net_ex(loc'); %ex-afference signal
+% % z_re=z'-z_ex;   %reafference component
+% % 
+% % % get all model
+% [ net_all,rsq_all,sig_all] = ni_network([loc t]',z');
+% %scramble loc
+% L=loc(randperm(size(loc,1)),:);
+% [ net_scr,rsq_ex_scr,sig_ex_scr]= ni_network([L t]',z');
+% %scramble mot
+% T=t(randperm(size(t,1)),:); %scramble all motor
+% [ net_scr,rsq_mot_scr,sig_mot_scr]= ni_network([loc T]',z');
+% [ net_scr,rsq_all_scr,sig_all_scr]= ni_network([L T]',z');
+% rsq.ex=rsq_ex;
+% rsq.re=rsq_re;
+% rsq.all=rsq_all;
+% rsq.ex_ctl=rsq_ex_scr;
+% rsq.re_ctl=rsq_mot_scr;
+% rsq.ctl=rsq_all_scr;
+% itemize and scramble motor info
+% for i=1:size(t,2)
+%     itemize
+%     [net_i,rsq_i(i),sig_i(i)] = ni_network(t(:,i)',z');
+%     T=t;
+%     T(:,i)=T(randperm(size(T,1)),i); %scramble
+%     [ net_scr,rsq_scr(i),sig_scr(i)]= ni_network([loc T]',z');
+% end
+% % NI models
+% [ net_ni,rsq_ni,sig_ni ] = ni_network([t]',z_re); %motor only
+% [ net_lfb,rsq_lfb,sig_lfb] = ni_network(z',z_re); %local only
+% [ net_fb,rsq_fb,sig_fb] = ni_network([fb]',z_re); %global only
+% [ net_lfbni,rsq_lfbni,sig_lfbni] = ni_network([t z]',z_re); %local + motor
+% [ net_fbni,rsq_fbni,sig_fbni] = ni_network([t fb]',z_re); %local + motor
+% prior pdf p(x,y)
+% [X,Y]=meshgrid(params.r_bins,params.th_bins);
+% [f,xi] = ksdensity(loc,[X(:) Y(:)]);
+% F=log(f);
+% F(isinf(F))=min(F(~isinf(F)));
+% [ net_prior,rsq_prior,sig_prior] = ni_network([X(:) Y(:)]',F');
+%% get exafference map
+zz=(z-nanmean(z))/nanstd(z);
+[N0,Mz,Sz]=tuning2d();
+AL=N0;
 
-Mzz=[Mz Mz(:,1)];
-AL=[AL AL(:,1)];
-F=gcf;
-A=gca;
-if(isfield(params,'image'))
-    sX=size(params.image,2);
-    sY=size(params.image,1);
-    ix=([1:sX]-sX/2)*pxl2mm;
-    iy=(-[1:sY]+sY/3)*pxl2mm;
-    if(params.bgcol==[1 1 1])
-        imagesc(ix,iy,params.image);
-    else
-        imagesc(ix,iy,255-params.image);
-    end
-    hold on;
-end
+%interpolate exafference 
+z_ex=interp2(params.r_bins,params.th_bins,Mz',r,th);
 
-S=polarplot3d(Mzz,AL,'AngularRange',[-pi pi],'plottype','surfa','RadialRange',params.r_lim,'AxisLocation','off','MeshScale',params.upsamp*[1 1]);
-if(strcmp(params.mfunc,'slope'))
-    set(A,'clim',[-1 1]);
-    set(A,'ALim',[-log10(0.1) -log10(0.01)+1]);
-else
-    set(A,'ALim',[0 20]);
-end
-if(isfield(params,'alim'))
-    set(A,'ALim',params.alim);
-end
-if(isfield(params,'clim'))
-    set(A,'CLim',params.clim);
-end
-view(0,90);
-set(gca,'FontSize',params.fontsize)
-set(gca,'XLim',params.r_lim(2)*[-1 1],'YLim',params.r_lim(2)*[-1 1]);
-set(gca,'Ydir','normal');
-if(strcmp(params.mfunc,'slope'))
-    if(params.bgcol==[0 0 0])
-        colormap(gca,invert_map(flipud(brewermap(64,'RdBu'))))
-    else
-%         colormap(gca,modified_jet);
-        colormap(gca,flipud(brewermap(64,'RdBU')));
-    end
-else
-    colormap(gca,'parula');
-end
+%plot data vs. exafference
+S=scatter(zz,z_ex,25,0*[1 1 1],'filled');
+set(S,'MarkerFaceAlpha',0.1,'MarkerFaceColor',1-params.bgcol,'MarkerEdgeAlpha',0);
+hold on;
+f1=fit(zz(~isnan(zz.*z_ex)),z_ex(~isnan(zz.*z_ex)),'poly1');
+v=[nanmin(z_ex) nanmax(z_ex)];
+% H=plot(v,v,':k');
+% set(H,'LineWidth',3);
+H=plot(f1);
+COL=brewermap(9,'Set1');
+set(H,'LineWidth',3,'Color',COL(2,:),'LineStyle',':');
+rsq=nancorr(zz,z_ex).^2;
+set(gca,'Color',params.bgcol,'XColor',1-params.bgcol,'YColor',1-params.bgcol,'FontSize',16,'XLabel',[],'YLabel',[]);
+legend('off');
 
-axis('image');
-hold off;
-set(gca,'Color','none','XColor','none','YColor','none','XGrid','off','YGrid','off');
-colorbar(gca,'Color',1-params.bgcol,'FontSize',params.fontsize,'FontWeight','normal','LineWidth',1);
-if(isfield(params,'poly'))
-    params.roinum=numel(params.poly);
-end
-
-if(params.roinum>0)
-    if(~isfield(params,'cmaps'))
-        C=brewermap(10,'Set1');
-    else
-        C=params.cmaps;
-    end
-    rr=1;
-    d=1e2;
-    for i=1:params.roinum %get roi PSTH
-        if(isfield(params,'poly'))
-            p{i}=params.poly{i};
-        else
-            h=imellipse(A);
-            p{i}=h.getVertices;
-    %         h=impoly(A);
-    %         p=h.getPosition;
-            h.setColor(C(i,:));
-        end
-        x=r.*sin(th); y=r.*cos(th);
-        in{i} = find(inpolygon(x,y,p{i}(:,1),p{i}(:,2)));
-        rr(i)=3;%min(ceil(numel(in{i})/1e3),10);
-        d=min(d,numel(in{i}));
-       cmap{i}=colormap_graded(C(i,:));        
-    end
-    if(~isfield(params,'aux_axes'))
-        figure;
-        params.aux_axes=axes;
-    end            
-    if(strfind(data_struct(1).fnames{z_col},'sc')) %spikes
-        a_out=plot_sorted_raster(raster,t,params.ops,in,d,rr,params.binsize,cmap,params.bgcol,params.aux_axes);
-    else %lfp
-        trnum=params.ops.seg(1).LFPgroups{str2num(data_struct(1).fnames{z_col}(end))};
-        a_out=plot_sorted_lfp(z,t,in,data_struct(1).avtraces(:,:,trnum,1),params.ops,params.bgcol,params.aux_axes);
-    end
-%     if(isfield(params,'poly'))
-        out_arg.inds=in;
-%     else
-        out_arg.p=p;
-        out_arg.a_out=a_out;
-%     end
-end
+% ind=find(~isnan(z_ex) & ~isnan(zz));
+% [f1,g1]=fit(z_ex(ind),zz(ind),'poly1');
+% plot(f1);
+% rsq=g1.rsquare;
+% set(gca,'FontSize',params.fontsize)
+% set(gca,'XLim',params.r_lim(2)*[-1 1],'YLim',params.r_lim(2)*[-1 1]);
+% set(gca,'Ydir','normal');
+% if(params.bgcol=='k')
+%     set(gca,'Color',[0 0 0],'XColor',[1 1 1],'YColor',[1 1 1]);
+%     set(gcf,'Color',[0 0 0]);
+%     colorbar(gca,'Color',[1 1 1]);
+% end
 
 
 function [N0,Mz,Sz]=tuning2d()
@@ -255,8 +223,6 @@ My=numel(params.th_edges)-1;
 N0=zeros(params.r_nbins,params.th_nbins);
 Mz=nan(params.r_nbins,params.th_nbins);
 Sz=nan(params.r_nbins,params.th_nbins);
-% zz=(z-nanmean(z))/nanstd(z);
-zz=z;
 for i=1:params.r_nbins
     for j=1:params.th_nbins
         idx=find(r>params.r_edges(i) & r<=params.r_edges(i+1) &...
@@ -284,11 +250,10 @@ end
 
 function [N0,P1,P2,Pv]=fitting2d()
 N0=zeros(params.r_nbins,params.th_nbins);
-Pv=zeros(params.r_nbins,params.th_nbins);
 P1=nan(params.r_nbins,params.th_nbins);
 P2=nan(params.r_nbins,params.th_nbins);
-zz=z;%(z-nanmean(z))/nanstd(z);
-tt=t;%(t-nanmean(t))/nanstd(t);
+zz=(z-nanmean(z))/nanstd(z);
+tt=(t-nanmean(t))/nanstd(t);
 ff=figure;
 for i=1:params.r_nbins
     for j=1:params.th_nbins
@@ -296,11 +261,26 @@ for i=1:params.r_nbins
             th>params.th_edges(j) & th<=params.th_edges(j+1));
         idx=idx(~isnan(tt(idx)+zz(idx)));             
         N0(i,j)=numel(idx);
-        if(numel(idx)>=max(params.minsamp,3))
+        if(numel(idx)>=params.minsamp)
             f=fit(tt(idx),zz(idx),'poly1');
+%             if(i==8 & j==2)
+%                 figure(ff);
+%                 H=plot(tt(idx),zz(idx),'.');
+%                 set(H,'MarkerSize',18);
+%                 hold on;
+%                 H=plot(f);
+%                 set(H,'Color',[0 0 0],'LineWidth',3);
+%                 legend('off');
+%                 hold off;
+%                 title(['i=',num2str(i),'; j=',num2str(j)]);
+%                 set(gcf,'Color',[1 1 1]);
+%                 drawnow;
+%             end
             P1(i,j)=f.p1;
             P2(i,j)=f.p2;
             [rp,pval]=corr(tt(idx),zz(idx));
+%             t_slope=rp*sqrt((numel(idx)-2)/(1-rp^2));
+%              N0(i,j)=-log10(pval);            
             Pv(i,j)=-log10(pval);
         end
     end
@@ -342,7 +322,6 @@ function convert_to_wall()
         R1=hypot((x-x0),(y-y0)); %distance of fish from center
         R2=(rx*ry)./sqrt((ry*cos(phi)).^2 + (rx*sin(phi)).^2); %distance of nearest point from cetner
         r=R2-R1;    %distance of fish to nearest wall
-%         r(r<=10)=nan;
         th=phi-a;   %egocentric angle of closest wall
         th(th>pi)=th(th>pi)-2*pi;
         th(th<-pi)=th(th<-pi)+2*pi;    

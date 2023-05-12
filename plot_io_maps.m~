@@ -1,0 +1,75 @@
+function [ ha ] = plot_io_maps(eod,file,lfpcol,unitcol,tcol,object)
+%PLOT_IO_MAPS plot offset and slope maps due to variable tcol in both lfp
+%and unit. object=0 for wall analysis
+bgcol=[1 1 1];
+offset_clim=[-1 1];
+offset_c=[0.02 0.99];
+slope_clim=[-1 1];
+fsize=20;
+[ret,sname]=system('hostname');
+if(strfind(sname,'Mac'))
+    rootdir='/Volumes/aw3057/';
+    sep='/';
+else
+    rootdir='Z:\';
+    sep='\';
+end
+load([rootdir,'mormyrid_data',sep,'fish_images',sep,'straight_image.mat']);
+setenv('PXLSIZE','0.423'); %pxl to mm conversion
+
+[ha, pos] = tight_subplot(2, 2, [.01 .03],[.1 .01],[.01 .01]);
+if(object==0) %wall analysis
+%     subplot(2,2,1); %lfp offset
+    axes(ha(1));
+    [Mz,N0]=plot_tuning_polar(eod,file,lfpcol,'t_col',tcol,'clim',offset_clim,...
+        'image',IMGS.cdata,'mfunc','offset','bgcol',bgcol);
+    c=quantile(Mz(:),[0.01 0.99]);
+    set(gca,'Clim',c);
+    colorbar('off');
+    T1=text(0,0.33,'LFP','Units','normalized','Rotation',90,'FontSize',fsize);
+    T2=text(0.4,.9,'Offset','Units','normalized','Rotation',0,'FontSize',fsize);
+    axes(ha(2));
+    plot_tuning_polar(eod,file,lfpcol,'t_col',tcol,'clim',slope_clim,...
+        'image',IMGS.cdata,'mfunc','slope','bgcol',bgcol);
+    colorbar('off');
+    T2=text(0.4,.9,'Slope','Units','normalized','Rotation',0,'FontSize',fsize);
+    axes(ha(3));
+    [Mz,N0]=plot_tuning_polar(eod,file,unitcol,'t_col',tcol,'clim',offset_clim,...
+        'image',IMGS.cdata,'mfunc','offset','bgcol',bgcol);
+    colorbar('off');
+    c=quantile(Mz(:),[0.01 0.99]);
+    set(gca,'Clim',c);
+    T1=text(0,0.33,'Unit','Units','normalized','Rotation',90,'FontSize',fsize);
+    axes(ha(4));
+    plot_tuning_polar(eod,file,unitcol,'t_col',tcol,'clim',slope_clim,...
+        'image',IMGS.cdata,'mfunc','slope','bgcol',bgcol);
+    colorbar('off');
+else %object analysis
+    axes(ha(1));
+    [Mz,N0]=plot_tuning2d(eod,file,lfpcol,'t_col',tcol,'clim',offset_clim,...
+        'image',IMGS.cdata,'mfunc','offset','bgcol',bgcol);
+    colorbar('off');
+    c=quantile(Mz(:),[0.01 0.99]);
+    set(gca,'Clim',c);
+    T1=text(0,0.33,'LFP','Units','normalized','Rotation',90,'FontSize',fsize);
+    T2=text(0.4,.9,'Offset','Units','normalized','Rotation',0,'FontSize',fsize);
+    axes(ha(2));
+    plot_tuning2d(eod,file,lfpcol,'t_col',tcol,'clim',slope_clim,...
+        'image',IMGS.cdata,'mfunc','slope','bgcol',bgcol);
+    colorbar('off');
+    T2=text(0.4,.9,'Slope','Units','normalized','Rotation',0,'FontSize',fsize);
+    axes(ha(3));
+    [Mz,N0]=plot_tuning2d(eod,file,unitcol,'t_col',tcol,'clim',offset_clim,...
+        'image',IMGS.cdata,'mfunc','offset','bgcol',bgcol);
+    colorbar('off');
+    c=quantile(Mz(:),[0.01 0.99]);
+    set(gca,'Clim',c);
+    T1=text(0,0.33,'Unit','Units','normalized','Rotation',90,'FontSize',fsize);
+    axes(ha(4));
+    plot_tuning2d(eod,file,unitcol,'t_col',tcol,'clim',slope_clim,...
+        'image',IMGS.cdata,'mfunc','slope','bgcol',bgcol);
+    colorbar('off');
+end        
+set(gcf,'Position',[360 143 560 560]);
+end
+

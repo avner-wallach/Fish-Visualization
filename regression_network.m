@@ -14,7 +14,8 @@ end
 % targets=targets(ind);
 %% generate network
 net = feedforwardnet(nhidden);
-net.layers{2}.transferFcn = outlayer;
+% net = patternnet(nhidden);
+% net.layers{2}.transferFcn = outlayer;
 %% train network
 net = train(net,inputs,targets,'useParallel','yes');%,'useGPU','yes');
 outputs=net(inputs);

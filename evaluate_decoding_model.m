@@ -5,8 +5,8 @@ pxl2mm=str2num(getenv('PXLSIZE'));
 figure;
 COL=colormap('lines');
 % COL(4,:)=0.5*[1 1 1];
-% fcolor=[0 0 0];
-fcolor=[1 1 1];
+fcolor=[0 0 0];
+% fcolor=[1 1 1];
 close(gcf);
 %% params
 params.mode='cart'; %cart=cartesian ; polar=polar
@@ -358,6 +358,8 @@ end
         hold off;
         set(gcf,'Color',fcolor);
         set(gca,'Color',fcolor,'XColor',fcolor,'YColor',fcolor);
+        set(gca,'clim',[1 4]);
+        colormap('hot');
 %         colorbar;
     end
 

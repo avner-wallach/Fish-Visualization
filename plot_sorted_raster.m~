@@ -1,0 +1,179 @@
+function [] = plot_sorted_raster( raster,svar,ops,winds,lines,Ns,binsize)
+sz=6;
+bgc=[0 0 0];
+fontsize=16;
+ksmooth=3;
+if(nargin<7)
+    binsize=4;
+end
+swin=[0 40]; %spike window in ms
+
+cmap={'autumn','winter','summer'};
+DR={};
+h=[];
+C=[];
+M=0;
+X=cell(numel(Ns),1);
+Y=cell(numel(Ns),1);
+S=cell(numel(Ns),1);
+G=[]; g=1;
+V=[];
+%%
+if(iscell(winds))
+   for j=1:numel(winds)
+       N=Ns(j);
+       wind=winds{j};
+       COL=colormap(cmap{j});
+       get_rasters_psth;
+       C=[C;COL(1:N,:)];
+   end
+else
+    j=1;
+    N=Ns;
+    wind=winds;
+    COL=colormap(cmap{1});
+    get_rasters_psth;
+    C=[C;COL(1:N,:)];
+end
+
+%% PSTH confidence int.
+% if(N==1)
+%     M=floor(sqrt(numel(v)));
+%     for m=1:M
+%         idx=randi(numel(v),floor(numel(v)/10),1);
+%         ind=find(ismember(rast(:,2),idx));
+%         hc(m,:)=histcounts(rast(ind,1),edges)/floor(numel(v)/10)/binsize*1e3;
+%     end
+%     hq=quantile(hc,[0.25 0.5 0.75],1);
+% end
+%         
+%% plot rasters and psth
+figure;
+a1=axes('Position',[0.13 0.42 0.775 0.5]);
+a2=axes('Position',[0.13 0.11 0.775 0.3]);
+
+%raster
+axes(a1);
+for i=1:numel(DR)
+    if(numel(DR{i})>0)
+        rastplot(DR{i},'|',C(i,:),sz);  
+    end
+    hold on;
+end
+set(gca,'Xlim',[edges(1) edges(end)],'Ylim',[0 M+1]);   
+set(a1,'Color',bgc,'XColor',bgc,'YColor',1-bgc,'FontSize',fontsize,'XTick',[],'YTick',[]);
+
+
+indblank=find(inrange(bins,[-ops.blankpre-ops.blankgap ops.blankpost]*1e3));
+axes(a2);
+for i=1:size(h,1)
+    hh=smooth(h(i,:),ksmooth);
+    hh(indblank)=nan;
+    H=plot(bins,hh);
+    set(H,'Color',C(i,:),'LineWidth',2);
+    hold on;
+end
+% my_plotWithConf_Q(bins,hq',[0 0 0],0.5);
+
+set(a2,'Color',bgc,'XColor',1-bgc,'YColor',1-bgc,'FontSize',fontsize,'box','off');
+set(gca,'Xlim',[edges(1) edges(end)]);
+set(gcf,'Color',bgc);
+
+%% plot input-output
+figure;
+boxplot(V,G,'PlotStyle','compact','Symbol','','Orientation','horizontal','Positions',cell2mat(Y),...
+    'Colors',C,'ColorGroup',G);
+bx=findobj('Tag','Box');
+set(bx,'LineWidth',10);
+ws=findobj('Tag','Whisker');
+set(ws,'LineWidth',2);
+cro=findobj('Tag','MedianInner');
+set(cro,'Marker','none');
+cri=findobj('Tag','MedianOuter');
+set(cri,'MarkerFaceColor',[1 1 1]);
+set(gca,'YLim',[min(cell2mat(Y))*0 max(cell2mat(Y))*1.1],'YTickMode','auto','YTickLabelMode','auto');
+% set(gca,'Xlim',[-1 1]);
+set(gca,'Xlim',[min(V) max(V)]);
+set(gca,'Color',bgc,'XColor',1-bgc,'YColor',1-bgc,'FontSize',fontsize,'box','off');
+set(gcf,'Color',bgc);
+hold on;
+% plot([mv' mv']',[cell2mat(Y)-cell2mat(S) cell2mat(Y)+cell2mat(S)]');
+c=1;
+for k=1:numel(Y)
+    H=plot(X{k},Y{k},':');
+    set(H,'LineWidth',2);
+    set(H,'Color',C(c,:));
+    c=c+numel(X{k});
+end
+
+    function get_rasters_psth
+        if(numel(wind)==2)
+            ind=find(inrange(raster(:,2),wind));
+            rast=raster(ind,:); 
+            rast(:,2)=rast(:,2)-wind(1);
+            if(wind(1)<1)
+                wind(1)=1;
+            end
+            if(isinf(wind(2)) | wind(2)>numel(svar))
+                wind(2)=numel(svar);
+            end
+            sv=svar(wind(1):wind(2));
+        elseif(numel(wind)>2)
+            ind=find(ismember(raster(:,2),wind));
+            q=zeros(numel(svar),1);
+            q(wind)=[1:numel(wind)];
+            rast=raster(ind,:); 
+            rast(:,2)=q(rast(:,2));        
+            sv=svar(wind);    
+        else
+            rast=raster;
+            sv=svar;
+        end
+        [rast,v]=sort_raster(rast,sv);
+
+        %convert to ms
+        rast(:,1)=rast(:,1)*1e3;
+        
+        %% PSTH
+        redges=round(linspace(1,numel(v),N+1));
+        edges=[-ops.rasterpre*1e3:binsize:ops.rasterpost*1e3];
+        bins=edge2bin(edges);        
+        bind=find(inrange(bins,swin));
+        for i=1:N
+            ind=find(inrange(rast(:,2),redges(i:i+1)));
+            h=[h;histcounts(rast(ind,1),edges)/diff(redges(i:i+1))/binsize*1e3];
+            indt=find(inrange(rast(ind,1),swin));
+            sc=histcounts(rast(ind(indt),2),[redges(i):redges(i+1)-1]);
+            vind=[redges(i):redges(i+1)-1]';
+            V=[V;v(vind)];            
+%             mv(i)=mean(v(vind));
+            G=[G;g*ones(size(vind))];
+            X{j}=[X{j};median(v(vind))];
+            Y{j}=[Y{j};mean(h(end,bind))];
+%             Y{j}=[Y{j};mean(sc)];
+%             S{j}=[S{j};std(sc)/sqrt(numel(sc))];
+            g=g+1;
+            drast=dilute_rast(rast(ind,:),redges(i),redges(i+1));
+            DR=[DR;drast];    
+        end
+        
+        if(N==1)
+            COL(1,:)=COL(32,:);
+        else
+            COL(1:N,:)=interp1([1:1:64],COL,linspace(1,64,N));
+        end
+%         M=M+numel(r);
+    end
+
+    function [drast,rmax]=dilute_rast(rrast,n1,n2)
+        r=round(linspace(n1,n2,lines));
+        ind=find(ismember(rrast(:,2),r));
+        q=zeros(n2-n1+1,1);
+        q(r)=[1:lines];
+        drast=rrast(ind,:); 
+        drast(:,2)=q(drast(:,2))+M;
+        M=M+lines;
+    end
+
+end
+

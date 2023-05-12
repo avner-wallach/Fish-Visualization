@@ -9,10 +9,10 @@ setenv('PXLSIZE',num2str(pxl2mm)); %pxl to mm conversion
 clim=[-2 2];
 alim=[];
 hfix='off';
-netmode='fbni'; %loc,ni,loc_mot,fb,none
+netmode='none'; %loc,ni,loc_mot,fb,none
 accmode=0;
 accnum=5;
-dispmode='posterior'; %tuning,likelihood,posterior,none
+dispmode='none'; %tuning,likelihood,posterior,none
 %hpf filter
 lp=100*2/samplerate;
 [NN, Wn] = buttord( lp, lp .* [0.75], 3, 20);
@@ -41,7 +41,7 @@ if(loading)
     load(datafile);        %for traces
     % get images
 end
-gframes=1;
+gframes=0;
 if(gframes)
     vidname=[fname,'video_',num2str(segs(fnum))];
     trackfile=[fname,'video_',num2str(segs(fnum)),'_tracking'];
@@ -54,7 +54,7 @@ end
 %% select network
 switch netmode
     case 'loc_mot'
-        net=net_struct.model_loc_mot.net;
+        net=net_struct.model_loc_mot.net;d
         sig=net_struct.model_loc_mot.sig;
     case 'loc'
         net=net_struct.model_loc.net;
